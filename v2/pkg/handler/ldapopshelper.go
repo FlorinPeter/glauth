@@ -177,6 +177,11 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 
 	// Now, check the pasword hash
 	if user.PassBcrypt != "" {
+		if !validatePassword(bindSimplePw) {
+			h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid credentials (policy)")
+			l.maybePutInTimeout(ctx, h, conn, true)
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
 		decoded, err := hex.DecodeString(user.PassBcrypt)
 		if err != nil {
 			h.GetLog().Info().Str("incorrect stored hash", "(omitted)").Msg("invalid credentials")
@@ -189,6 +194,12 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 		}
 	}
 	if user.PassSHA256 != "" {
+		if !validatePassword(bindSimplePw) {
+			h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid credentials (policy)")
+			l.maybePutInTimeout(ctx, h, conn, true)
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+
 		hash := sha256.New()
 		hash.Write([]byte(bindSimplePw))
 		if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
